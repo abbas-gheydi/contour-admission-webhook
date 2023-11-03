@@ -91,6 +91,9 @@ func Setup(address, tlsCertPath, tlsKeyPath string, cache *cache.Cache) {
 	e.POST("/v1/validate", func(c echo.Context) error {
 		return serve(c, cache, validateV1)
 	})
+	e.GET("/readyz", func(c echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
 
 	e.Logger.Fatal(e.StartTLS(address, tlsCertPath, tlsKeyPath))
 }
