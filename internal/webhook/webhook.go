@@ -85,7 +85,11 @@ func Setup(address, tlsCertPath, tlsKeyPath string, cache *cache.Cache) {
 	//nolint:varnamelen
 	e := echo.New()
 
-	e.Use(middleware.Logger())
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Skipper: func(c echo.Context) bool {
+			return c.Path() == "/readyz"
+		},
+	}))
 	e.Use(middleware.Recover())
 
 	e.POST("/v1/validate", func(c echo.Context) error {
