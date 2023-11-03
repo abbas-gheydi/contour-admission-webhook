@@ -1,6 +1,8 @@
 package webhook
 
 import (
+	"net/http"
+
 	contourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 	"github.com/snapp-incubator/contour-admission-webhook/internal/cache"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -45,6 +47,8 @@ func (cfoc checkFqdnOnCreate) check(cr *checkRequest) (*admissionv1.AdmissionRes
 	if acquired {
 		return &admissionv1.AdmissionResponse{Allowed: false,
 			Result: &metav1.Status{
+				// http code and message returned to the user
+				Code:    http.StatusForbidden,
 				Message: "HTTPProxy's fqdn is already acquired by another HTTPProxy object",
 			}}, nil
 	}
@@ -91,6 +95,8 @@ func (cfou checkFqdnOnUpdate) check(cr *checkRequest) (*admissionv1.AdmissionRes
 		if acquired {
 			return &admissionv1.AdmissionResponse{Allowed: false,
 				Result: &metav1.Status{
+					// http code and message returned to the user
+					Code:    http.StatusForbidden,
 					Message: "HTTPProxy's fqdn is already acquired by another HTTPProxy object",
 				}}, nil
 		}
@@ -119,6 +125,8 @@ func (cfou checkFqdnOnUpdate) check(cr *checkRequest) (*admissionv1.AdmissionRes
 	if acquired {
 		return &admissionv1.AdmissionResponse{Allowed: false,
 			Result: &metav1.Status{
+				// http code and message returned to the user
+				Code:    http.StatusForbidden,
 				Message: "HTTPProxy's fqdn is already acquired by another HTTPProxy object",
 			}}, nil
 	}
