@@ -11,9 +11,10 @@ import (
 )
 
 type checkRequest struct {
-	new   *contourv1.HTTPProxy
-	old   *contourv1.HTTPProxy
-	cache *cache.Cache
+	newObj *contourv1.HTTPProxy
+	oldObj *contourv1.HTTPProxy
+	dryRun *bool
+	cache  *cache.Cache
 }
 
 type checkFqdnOnCreate struct {
@@ -30,10 +31,16 @@ type checkFqdnOnDelete struct {
 
 //nolint:varnamelen
 func (cfoc checkFqdnOnCreate) check(cr *checkRequest) (*admissionv1.AdmissionResponse, error) {
+	var dryRun bool
+
+	if cr.dryRun != nil {
+		dryRun = *cr.dryRun
+	}
+
 	cr.cache.Mu.Lock()
 	defer cr.cache.Mu.Unlock()
 
-	if cr.new.Spec.VirtualHost == nil {
+	if cr.newObj.Spec.VirtualHost == nil {
 		if cfoc.next != nil {
 			return cfoc.next.check(cr)
 		}
@@ -41,7 +48,7 @@ func (cfoc checkFqdnOnCreate) check(cr *checkRequest) (*admissionv1.AdmissionRes
 		return &admissionv1.AdmissionResponse{Allowed: true}, nil
 	}
 
-	fqdn := cr.new.Spec.VirtualHost.Fqdn
+	fqdn := cr.newObj.Spec.VirtualHost.Fqdn
 
 	_, acquired := cr.cache.FqdnMap[fqdn]
 	if acquired {
@@ -53,7 +60,9 @@ func (cfoc checkFqdnOnCreate) check(cr *checkRequest) (*admissionv1.AdmissionRes
 			}}, nil
 	}
 
-	cr.cache.FqdnMap[fqdn] = &types.NamespacedName{Namespace: cr.new.Namespace, Name: cr.new.Name}
+	if !dryRun {
+		cr.cache.FqdnMap[fqdn] = &types.NamespacedName{Namespace: cr.newObj.Namespace, Name: cr.newObj.Name}
+	}
 
 	if cfoc.next != nil {
 		return cfoc.next.check(cr)
@@ -68,28 +77,36 @@ func (cfoc *checkFqdnOnCreate) setNext(c checker) {
 
 //nolint:varnamelen
 func (cfou checkFqdnOnUpdate) check(cr *checkRequest) (*admissionv1.AdmissionResponse, error) {
+	var dryRun bool
+
+	if cr.dryRun != nil {
+		dryRun = *cr.dryRun
+	}
+
 	cr.cache.Mu.Lock()
 	defer cr.cache.Mu.Unlock()
 
 	//nolint:nestif
-	if cr.new.Spec.VirtualHost == nil && cr.old.Spec.VirtualHost == nil {
+	if cr.newObj.Spec.VirtualHost == nil && cr.oldObj.Spec.VirtualHost == nil {
 		if cfou.next != nil {
 			return cfou.next.check(cr)
 		}
 
 		return &admissionv1.AdmissionResponse{Allowed: true}, nil
-	} else if cr.new.Spec.VirtualHost == nil && cr.old.Spec.VirtualHost != nil {
-		oldFqdn := cr.old.Spec.VirtualHost.Fqdn
+	} else if cr.newObj.Spec.VirtualHost == nil && cr.oldObj.Spec.VirtualHost != nil {
+		oldFqdn := cr.oldObj.Spec.VirtualHost.Fqdn
 
-		delete(cr.cache.FqdnMap, oldFqdn)
+		if !dryRun {
+			delete(cr.cache.FqdnMap, oldFqdn)
+		}
 
 		if cfou.next != nil {
 			return cfou.next.check(cr)
 		}
 
 		return &admissionv1.AdmissionResponse{Allowed: true}, nil
-	} else if cr.new.Spec.VirtualHost != nil && cr.old.Spec.VirtualHost == nil {
-		fqdn := cr.new.Spec.VirtualHost.Fqdn
+	} else if cr.newObj.Spec.VirtualHost != nil && cr.oldObj.Spec.VirtualHost == nil {
+		fqdn := cr.newObj.Spec.VirtualHost.Fqdn
 
 		_, acquired := cr.cache.FqdnMap[fqdn]
 		if acquired {
@@ -101,7 +118,9 @@ func (cfou checkFqdnOnUpdate) check(cr *checkRequest) (*admissionv1.AdmissionRes
 				}}, nil
 		}
 
-		cr.cache.FqdnMap[fqdn] = &types.NamespacedName{Namespace: cr.new.Namespace, Name: cr.new.Name}
+		if !dryRun {
+			cr.cache.FqdnMap[fqdn] = &types.NamespacedName{Namespace: cr.newObj.Namespace, Name: cr.newObj.Name}
+		}
 
 		if cfou.next != nil {
 			return cfou.next.check(cr)
@@ -110,8 +129,8 @@ func (cfou checkFqdnOnUpdate) check(cr *checkRequest) (*admissionv1.AdmissionRes
 		return &admissionv1.AdmissionResponse{Allowed: true}, nil
 	}
 
-	fqdn := cr.new.Spec.VirtualHost.Fqdn
-	oldFqdn := cr.old.Spec.VirtualHost.Fqdn
+	fqdn := cr.newObj.Spec.VirtualHost.Fqdn
+	oldFqdn := cr.oldObj.Spec.VirtualHost.Fqdn
 
 	if fqdn == oldFqdn {
 		if cfou.next != nil {
@@ -131,9 +150,10 @@ func (cfou checkFqdnOnUpdate) check(cr *checkRequest) (*admissionv1.AdmissionRes
 			}}, nil
 	}
 
-	cr.cache.FqdnMap[fqdn] = &types.NamespacedName{Namespace: cr.new.Namespace, Name: cr.new.Name}
-
-	delete(cr.cache.FqdnMap, oldFqdn)
+	if !dryRun {
+		cr.cache.FqdnMap[fqdn] = &types.NamespacedName{Namespace: cr.newObj.Namespace, Name: cr.newObj.Name}
+		delete(cr.cache.FqdnMap, oldFqdn)
+	}
 
 	if cfou.next != nil {
 		return cfou.next.check(cr)
@@ -148,10 +168,16 @@ func (cfou *checkFqdnOnUpdate) setNext(c checker) {
 
 //nolint:varnamelen
 func (cfod checkFqdnOnDelete) check(cr *checkRequest) (*admissionv1.AdmissionResponse, error) {
+	var dryRun bool
+
+	if cr.dryRun != nil {
+		dryRun = *cr.dryRun
+	}
+
 	cr.cache.Mu.Lock()
 	defer cr.cache.Mu.Unlock()
 
-	if cr.old.Spec.VirtualHost == nil {
+	if cr.oldObj.Spec.VirtualHost == nil {
 		if cfod.next != nil {
 			return cfod.next.check(cr)
 		}
@@ -159,9 +185,11 @@ func (cfod checkFqdnOnDelete) check(cr *checkRequest) (*admissionv1.AdmissionRes
 		return &admissionv1.AdmissionResponse{Allowed: true}, nil
 	}
 
-	oldFqdn := cr.old.Spec.VirtualHost.Fqdn
+	oldFqdn := cr.oldObj.Spec.VirtualHost.Fqdn
 
-	delete(cr.cache.FqdnMap, oldFqdn)
+	if !dryRun {
+		delete(cr.cache.FqdnMap, oldFqdn)
+	}
 
 	if cfod.next != nil {
 		return cfod.next.check(cr)

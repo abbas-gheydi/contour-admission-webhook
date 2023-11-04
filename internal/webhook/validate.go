@@ -39,9 +39,10 @@ func validateV1(ar admissionv1.AdmissionReview, cache *cache.Cache) (*admissionv
 	}
 
 	cr := &checkRequest{
-		new:   httpproxy,
-		old:   httpproxyOld,
-		cache: cache,
+		newObj: httpproxy,
+		oldObj: httpproxyOld,
+		dryRun: ar.Request.DryRun,
+		cache:  cache,
 	}
 
 	switch ar.Request.Operation {
