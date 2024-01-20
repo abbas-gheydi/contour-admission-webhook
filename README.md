@@ -83,3 +83,4 @@ Below is a list of tasks that need attention. If you're contributing to this pro
 - Add Helm chart
 - Make cache key configurable
 - Implement a mechanism to warm up the controller cache before launching the webhook server 
+- Add E2E tests
