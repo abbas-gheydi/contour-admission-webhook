@@ -14,6 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/main.go cmd/main.go
 COPY internal/ internal/
+COPY pkg/ pkg/
 
 # Copy the Makefile
 COPY Makefile .

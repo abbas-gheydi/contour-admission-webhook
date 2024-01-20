@@ -1,0 +1,13 @@
+cache:
+  cleanUpIntervalSecond: 30
+  entryTtlSecond: 10
+ingressClasses:
+- "private"
+- "inter-dc"
+- "inter-venture"
+- "public"
+- "test"
+webhook:
+  port: 8443
+  tlsCertFile: "./hack/tls.crt"
+  tlsKeyFile: "./hack/tls.key"
