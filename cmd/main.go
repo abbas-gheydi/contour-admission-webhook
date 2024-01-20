@@ -14,35 +14,96 @@ package main
 
 import (
 	"flag"
+	"os"
+	"time"
 
+	contourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 	"github.com/snapp-incubator/contour-admission-webhook/internal/cache"
-	"github.com/snapp-incubator/contour-admission-webhook/internal/client"
+	"github.com/snapp-incubator/contour-admission-webhook/internal/config"
+	controller "github.com/snapp-incubator/contour-admission-webhook/internal/controller/httpproxy"
 	"github.com/snapp-incubator/contour-admission-webhook/internal/webhook"
-	"k8s.io/klog/v2"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+)
+
+var (
+	scheme = runtime.NewScheme()
+	logger = ctrl.Log.WithName("setup")
 )
 
 func init() {
-	klog.InitFlags(nil)
+	utilruntime.Must(contourv1.AddToScheme(scheme))
 }
 
 func main() {
-	var address, tlsKeyPath, tlsCertPath string
+	ctrl.SetLogger(zap.New())
 
-	flag.StringVar(&address, "address", ":8443", "Server listen address")
-	flag.StringVar(&tlsKeyPath, "tls-key-path", "./tls.key", "Path to the TLS key")
-	flag.StringVar(&tlsCertPath, "tls-cert-path", "./tls.crt", "Path to the TLS certificate")
+	var configFilePath string
+
+	flag.StringVar(&configFilePath, "config-file-path", "./config.yaml", "The config file path.")
 	flag.Parse()
 
-	client, err := client.NewK8sClient()
+	logger.Info("initializing config")
+
+	if err := config.InitializeConfig(configFilePath); err != nil {
+		logger.Error(err, "error reading the config file")
+
+		os.Exit(1)
+	}
+
+	logger.Info("initializing cache")
+
+	cfg := config.GetConfig()
+
+	cache := cache.NewCache(time.Duration(cfg.Cache.CleanUpIntervalSecond) * time.Second)
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:         scheme,
+		LeaderElection: false,
+	})
 	if err != nil {
-		klog.Fatalf("K8s client setup failed: %s", err)
+		logger.Error(err, "unable to create manager")
+
+		os.Exit(1)
 	}
 
-	cache := cache.NewCache()
+	reconcilerExtended := controller.NewReconcilerExtended(mgr, cache)
 
-	if err := cache.PopulateInitialCache(client); err != nil {
-		klog.Fatalf("Cache initialization failed: %s", err)
+	if err = reconcilerExtended.SetupWithManager(mgr); err != nil {
+		logger.Error(err, "unable to set up the controller with the manager", "controller", "httpproxy")
+
+		os.Exit(1)
 	}
 
-	webhook.Setup(address, tlsCertPath, tlsKeyPath, cache)
+	errChan := make(chan error)
+
+	ctx := ctrl.SetupSignalHandler()
+
+	go func() {
+		logger.Info("starting controller(s)")
+
+		if err := mgr.Start(ctx); err != nil {
+			errChan <- err
+		}
+
+		errChan <- nil
+	}()
+
+	// This call is non-blocking.
+	webhookStoppedCh, webhookListenerStoppedCh := webhook.Setup(cache)
+
+	select {
+	case err := <-errChan:
+		logger.Error(err, "encountered error; exited")
+
+		os.Exit(1)
+	case <-ctx.Done():
+		<-webhookStoppedCh
+
+		<-webhookListenerStoppedCh
+
+		os.Exit(0)
+	}
 }

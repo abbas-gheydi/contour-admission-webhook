@@ -13,49 +13,118 @@
 package cache
 
 import (
-	"context"
-	"fmt"
 	"sync"
+	"time"
 
-	contourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
+	"github.com/snapp-incubator/contour-admission-webhook/pkg/utils"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
+)
+
+var (
+	logger = ctrl.Log.WithName("cache")
 )
 
 type Cache struct {
-	FqdnMap map[string]*types.NamespacedName
-	Mu      *sync.RWMutex
+	fqdnMap         map[string]*element // map[ingressClassName/FQDN]*element
+	mu              *sync.RWMutex
+	cleanUpTicker   *time.Ticker // Ticker
+	CleanUpStopChan chan bool    // Channel for stopping the ticker
 }
 
-func NewCache() *Cache {
-	return &Cache{
-		FqdnMap: make(map[string]*types.NamespacedName),
-		Mu:      &sync.RWMutex{},
+type element struct {
+	Value     *types.NamespacedName
+	ExpiresAt int64
+}
+
+func NewCache(cleanUpInterval time.Duration) *Cache {
+	cache := &Cache{
+		fqdnMap:         make(map[string]*element),
+		mu:              &sync.RWMutex{},
+		cleanUpTicker:   time.NewTicker(cleanUpInterval),
+		CleanUpStopChan: make(chan bool),
+	}
+
+	cache.StartCleaner()
+
+	return cache
+}
+
+func (c *Cache) Set(key string, value *types.NamespacedName, expirationUnixTime int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.fqdnMap[key] = &element{
+		Value:     value,
+		ExpiresAt: expirationUnixTime,
 	}
 }
 
-func (c *Cache) PopulateInitialCache(client client.Client) error {
-	httpproxyList := &contourv1.HTTPProxyList{}
+func (c *Cache) Get(key string) (*types.NamespacedName, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-	if err := client.List(context.Background(), httpproxyList); err != nil {
-		return err
+	element, found := c.fqdnMap[key]
+	if !found {
+		return nil, false
 	}
 
-	for _, httpproxy := range httpproxyList.Items {
-		if httpproxy.Spec.VirtualHost == nil {
-			continue
-		}
+	return element.Value, true
+}
 
-		fqdn := httpproxy.Spec.VirtualHost.Fqdn
-		if fqdn != "" {
-			_, acquired := c.FqdnMap[fqdn]
-			if acquired {
-				return fmt.Errorf("FQDN \"%s\" acquired by multiple HTTPProxy objects", fqdn)
+func (c *Cache) Delete(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	delete(c.fqdnMap, key)
+}
+
+func (c *Cache) KeyExists(key string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	_, found := c.fqdnMap[key]
+
+	return found
+}
+
+func (c *Cache) IsKeyPersisted(key string) *bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	entry, found := c.fqdnMap[key]
+	if !found {
+		return nil
+	}
+
+	return utils.BoolPointer(entry.ExpiresAt == 0)
+}
+
+func (c *Cache) StartCleaner() {
+	go func() {
+	out:
+		for {
+			select {
+			case <-c.cleanUpTicker.C:
+				c.cleanUp()
+			case <-c.CleanUpStopChan:
+				break out
 			}
+		}
+	}()
+}
 
-			c.FqdnMap[fqdn] = &types.NamespacedName{Namespace: httpproxy.Namespace, Name: httpproxy.Name}
+func (c *Cache) cleanUp() {
+	now := time.Now().Unix()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for key, element := range c.fqdnMap {
+		if element.ExpiresAt > 0 && now >= element.ExpiresAt {
+			delete(c.fqdnMap, key)
+
+			logger.Info("cache entry is expired hence deleted", "entry", key)
 		}
 	}
-
-	return nil
 }
