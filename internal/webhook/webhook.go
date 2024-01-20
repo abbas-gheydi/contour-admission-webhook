@@ -1,13 +1,13 @@
 package webhook
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/labstack/echo/v4"
 	contourv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 	"github.com/snapp-incubator/contour-admission-webhook/internal/cache"
@@ -25,6 +25,8 @@ var (
 	scheme       = runtime.NewScheme()
 	codecFactory = serializer.NewCodecFactory(scheme)
 	deserializer = codecFactory.UniversalDeserializer()
+
+	json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 	entryTtlSecond int
 
