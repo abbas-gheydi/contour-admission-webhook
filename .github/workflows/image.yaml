@@ -1,9 +1,10 @@
-name: Build Container Image
+name: Build and push container image
 
 on:
   push:
     tags:
       - 'v*'
+      - 'snappcloud-v*'
 
 jobs:
   docker:
