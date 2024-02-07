@@ -2,7 +2,7 @@ module github.com/snapp-incubator/contour-admission-webhook
 
 go 1.21.3
 
-replace github.com/projectcontour/contour => github.com/snapp-incubator/contour v1.27.0-rc.6
+replace github.com/projectcontour/contour => github.com/snapp-incubator/contour v1.27.0-rc.7
 
 require (
 	github.com/go-logr/logr v1.4.1
