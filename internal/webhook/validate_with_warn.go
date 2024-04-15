@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func validateWariningRules(response *admissionv1.AdmissionResponse, err *httpErr, request *checkRequest, checkers ...checker) (*admissionv1.AdmissionResponse, *httpErr) {
+func validateWarningRules(response *admissionv1.AdmissionResponse, err *httpErr, request *checkRequest, checkers ...checker) (*admissionv1.AdmissionResponse, *httpErr) {
 	//If the request is rejected during rule checking, then do not process the warning rules.
 	if !response.Allowed {
 		return response, err

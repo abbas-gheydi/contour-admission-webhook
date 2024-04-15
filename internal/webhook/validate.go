@@ -68,7 +68,7 @@ func validateV1(ar admissionv1.AdmissionReview, cache *cache.Cache) (*admissionv
 
 		response, err := cicnoc.check(cr)
 		//warning rules
-		response, err = validateWariningRules(response, err, cr, &warningValidatorRlsRules)
+		response, err = validateWarningRules(response, err, cr, &warningValidatorRlsRules)
 
 		return response, err
 
@@ -80,7 +80,7 @@ func validateV1(ar admissionv1.AdmissionReview, cache *cache.Cache) (*admissionv
 
 		response, err := cicnou.check(cr)
 		//warning rules
-		response, err = validateWariningRules(response, err, cr, &warningValidatorRlsRules)
+		response, err = validateWarningRules(response, err, cr, &warningValidatorRlsRules)
 
 		return response, err
 
