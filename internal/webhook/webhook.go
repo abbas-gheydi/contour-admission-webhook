@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -149,7 +150,7 @@ func (ah *admissionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	jsonData, err := json.Marshal(responseObj)
 	if err != nil {
-		http.Error(w, "error encoding response json", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("error encoding response object to json: %s", err.Error()), http.StatusInternalServerError)
 
 		return
 	}
@@ -173,7 +174,35 @@ func readinessHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func Setup(cache *cache.Cache) (<-chan struct{}, <-chan struct{}) {
+type Webhook struct {
+	cache          *cache.Cache
+	shouldMutate   bool
+	shouldValidate bool
+}
+
+func NewWebhook() *Webhook {
+	return &Webhook{}
+}
+
+func (wh *Webhook) AddCache(cache *cache.Cache) *Webhook {
+	wh.cache = cache
+
+	return wh
+}
+
+func (wh *Webhook) ShouldMutate() *Webhook {
+	wh.shouldMutate = true
+
+	return wh
+}
+
+func (wh *Webhook) ShouldValidate() *Webhook {
+	wh.shouldValidate = true
+
+	return wh
+}
+
+func (wh *Webhook) Setup(stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}) {
 	// Populate the global variable once to prevent further resource allocations per validation request
 	cfg := config.GetConfig()
 	entryTtlSecond = cfg.Cache.EntryTtlSecond
@@ -183,10 +212,20 @@ func Setup(cache *cache.Cache) (<-chan struct{}, <-chan struct{}) {
 	serverConfig := serverOptions.newServerConfig()
 
 	mux := http.NewServeMux()
-	mux.Handle("/v1/validate", &admissionHandler{cache: cache, handler: validateV1})
-	mux.Handle("/readyz", http.HandlerFunc(readinessHandler))
 
-	stopCh := apiserver.SetupSignalHandler()
+	if wh.shouldValidate {
+		if wh.cache == nil {
+			panic(errors.New("cache is required for webhook validate endpoint"))
+		}
+
+		mux.Handle("/v1/validate", &admissionHandler{cache: wh.cache, handler: validateV1})
+	}
+
+	if wh.shouldMutate {
+		mux.Handle("/v1/mutate", &admissionHandler{cache: nil, handler: mutateV1})
+	}
+
+	mux.Handle("/readyz", http.HandlerFunc(readinessHandler))
 
 	stoppedCh, listenerStoppedCh, err := serverConfig.secureServingInfo.Serve(mux, 30*time.Second, stopCh)
 	if err != nil {
