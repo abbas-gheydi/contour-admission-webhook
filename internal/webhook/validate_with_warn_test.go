@@ -13,6 +13,8 @@ import (
 
 // getHTTPProxyFromYAML reads a YAML file containing an HTTPProxy object
 // and returns the parsed HTTPProxy object.
+//
+//nolint:varnamelen
 func getHTTPProxyFromYAML(path string) (*contourv1.HTTPProxy, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -50,7 +52,7 @@ func Test_validateWarningRules(t *testing.T) {
 	}
 
 	// Test: An HTTPProxy with valid RLS configuration should not have warnings.
-	acceptedResponse, err := validateWarningRules(request.givenResponse, nil, request.request, request.checkers...)
+	acceptedResponse, _ := validateWarningRules(request.givenResponse, nil, request.request, request.checkers...)
 	if !acceptedResponse.Allowed {
 		t.Error("response for HTTPProxy with valid configuration should be allowed")
 	}
@@ -60,7 +62,7 @@ func Test_validateWarningRules(t *testing.T) {
 
 	// Test: A request with incorrect configuration should trigger warnings.
 	request.request.newObj.Spec.Routes[0].RateLimitPolicy.Global.Descriptors[0].Entries[0].GenericKey.Key = "wrong.name.xx"
-	acceptedResponseWithWarn, err := validateWarningRules(request.givenResponse, nil, request.request, request.checkers...)
+	acceptedResponseWithWarn, _ := validateWarningRules(request.givenResponse, nil, request.request, request.checkers...)
 	if len(acceptedResponseWithWarn.Warnings) == 0 {
 		t.Error("for request with incorrect configuration, warning should be sent")
 	}
