@@ -34,8 +34,8 @@ func validateWarningRules(response *admissionv1.AdmissionResponse, err *httpErr,
 	}}, nil
 }
 
-func acceptWithWarning(message string) (*admissionv1.AdmissionResponse, *httpErr) {
-	message = fmt.Sprint("Rate Limit Config Error: ", message)
+func acceptWithWarning(prefix, message string) (*admissionv1.AdmissionResponse, *httpErr) {
+	message = fmt.Sprint(prefix, message)
 
 	messageMaxLenth := 120
 	if lenMsg := len(message); lenMsg < 120 {

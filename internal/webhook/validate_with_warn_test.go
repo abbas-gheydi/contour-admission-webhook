@@ -80,17 +80,17 @@ func Test_acceptWithWarning(t *testing.T) {
 		{
 			name: "msg with value less than 120 char",
 			args: args{message: "test"},
-			want: &admissionv1.AdmissionResponse{Allowed: true, Warnings: []string{"Rate Limit Config Error: test"}},
+			want: &admissionv1.AdmissionResponse{Allowed: true, Warnings: []string{rlsPrefixMsg + "test"}},
 		},
 		{
 			name: "msg with value more than 120 should truncate to 120",
 			args: args{message: strings.Repeat("a", 120)},
-			want: &admissionv1.AdmissionResponse{Allowed: true, Warnings: []string{"Rate Limit Config Error: " + strings.Repeat("a", 120-len("Rate Limit Config Error: "))}},
+			want: &admissionv1.AdmissionResponse{Allowed: true, Warnings: []string{rlsPrefixMsg + strings.Repeat("a", 120-len("Rate Limit Config Error: "))}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _ := acceptWithWarning(tt.args.message)
+			got, _ := acceptWithWarning(rlsPrefixMsg, tt.args.message)
 			if tt.want.Warnings[0] != got.Warnings[0] {
 				t.Errorf("acceptWithWarning() got = %v, want %v", got, tt.want)
 			}
