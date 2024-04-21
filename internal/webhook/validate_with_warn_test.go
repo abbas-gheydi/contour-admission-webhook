@@ -14,7 +14,7 @@ import (
 // getHTTPProxyFromYAML reads a YAML file containing an HTTPProxy object
 // and returns the parsed HTTPProxy object.
 //
-//nolint:varnamelen
+//nolint:all
 func getHTTPProxyFromYAML(path string) (*contourv1.HTTPProxy, error) {
 	file, err := os.Open(path)
 	if err != nil {
