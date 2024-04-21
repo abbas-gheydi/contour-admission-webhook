@@ -23,9 +23,10 @@ import (
 var config Config
 
 type Config struct {
-	Cache          Cache    `yaml:"cache"`
-	IngressClasses []string `yaml:"ingressClasses"`
-	Webhook        Webhook  `yaml:"webhook"`
+	Cache                 Cache    `yaml:"cache"`
+	IdleConnectionTimeout string   `yaml:"idleConnectionTimeout"`
+	IngressClasses        []string `yaml:"ingressClasses"`
+	Webhook               Webhook  `yaml:"webhook"`
 }
 
 type Cache struct {

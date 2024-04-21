@@ -22,7 +22,7 @@ func (mict mutateIdleConnectionTimeout) mutate(mr *mutateRequest) {
 					map[string]interface{}{
 						"op":    "add",
 						"path":  fmt.Sprintf("/spec/routes/%d/timeoutPolicy/idleConnection", index),
-						"value": "15s",
+						"value": idleConnectionTimeout,
 					})
 
 				mutated = true
@@ -32,7 +32,7 @@ func (mict mutateIdleConnectionTimeout) mutate(mr *mutateRequest) {
 						"op":   "add",
 						"path": fmt.Sprintf("/spec/routes/%d/timeoutPolicy", index),
 						"value": map[string]string{
-							"idleConnection": "15s",
+							"idleConnection": idleConnectionTimeout,
 						},
 					})
 

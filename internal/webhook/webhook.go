@@ -29,7 +29,8 @@ var (
 
 	json = jsoniter.ConfigCompatibleWithStandardLibrary
 
-	entryTtlSecond int
+	entryTtlSecond        int
+	idleConnectionTimeout string
 
 	logger = ctrl.Log.WithName("webhook")
 )
@@ -206,6 +207,7 @@ func (wh *Webhook) Setup(stopCh <-chan struct{}) (<-chan struct{}, <-chan struct
 	// Populate the global variable once to prevent further resource allocations per validation request
 	cfg := config.GetConfig()
 	entryTtlSecond = cfg.Cache.EntryTtlSecond
+	idleConnectionTimeout = cfg.IdleConnectionTimeout
 
 	serverOptions := newServerOptions(cfg.Webhook.Port, cfg.Webhook.TLSCertFile, cfg.Webhook.TLSKeyFile)
 
