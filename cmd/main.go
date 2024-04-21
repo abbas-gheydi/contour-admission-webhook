@@ -91,18 +91,37 @@ func main() {
 		errChan <- nil
 	}()
 
-	// This call is non-blocking.
-	webhookStoppedCh, webhookListenerStoppedCh := webhook.Setup(cache)
+	stopCh := make(chan struct{})
+
+	// This call is non-blocking
+	webhookStoppedCh, webhookListenerStoppedCh := webhook.NewWebhook().
+		AddCache(cache).
+		ShouldMutate().
+		ShouldValidate().
+		Setup(stopCh)
 
 	select {
 	case err := <-errChan:
 		logger.Error(err, "encountered error; exited")
 
 		os.Exit(1)
+
 	case <-ctx.Done():
+		logger.Info("shutdown signal received; stopping webhook")
+
+		close(stopCh)
+
+		logger.Info("waiting for webhook to finish")
+
 		<-webhookStoppedCh
 
+		logger.Info("all active requests have been processed")
+
 		<-webhookListenerStoppedCh
+
+		logger.Info("webhook http server stopped listening")
+
+		cache.CleanUpStopChan <- true
 
 		os.Exit(0)
 	}

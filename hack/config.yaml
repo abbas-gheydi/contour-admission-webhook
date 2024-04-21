@@ -1,6 +1,7 @@
 cache:
   cleanUpIntervalSecond: 30
   entryTtlSecond: 10
+idleConnectionTimeout: 15s
 ingressClasses:
 - "private"
 - "inter-dc"
